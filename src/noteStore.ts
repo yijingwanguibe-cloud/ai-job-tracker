@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { NoteRecord, NoteCategory } from './types';
+import { NoteRecord } from './types';
 
 const generateId = () => {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);

@@ -60,63 +60,6 @@ function extractPosition(text: string): string {
   return '未提供';
 }
 
-function extractResponsibilities(text: string): string[] {
-  const responsibilities: string[] = [];
-  const descMatch = text.match(/职位描述[\s\S]*?(?=任职要求|任职资格|岗位要求|职位要求|$)/i) ||
-                   text.match(/岗位职责[\s\S]*?(?=任职要求|任职资格|岗位要求|职位要求|$)/i) ||
-                   text.match(/工作内容[\s\S]*?(?=任职要求|任职资格|岗位要求|职位要求|$)/i);
-  if (descMatch) {
-    const descText = descMatch[0];
-    const lines = descText.split(/\n/).filter(line => line.trim().length > 0);
-    for (let line of lines) {
-      line = line.trim();
-      if (/^[1-9]、/.test(line) || /^[1-9]\./.test(line) || /^•/.test(line)) {
-        const cleaned = line.replace(/^[1-9]、|^[1-9]\.|^•\s*/, '').trim();
-        if (cleaned.length > 0) {
-          responsibilities.push(cleaned);
-        }
-      }
-    }
-  }
-  
-  if (responsibilities.length === 0) {
-    responsibilities.push('负责相关产品的规划与设计');
-    responsibilities.push('数据分析与业务优化');
-    responsibilities.push('与相关团队协作推进项目');
-  }
-  
-  return responsibilities.slice(0, 5);
-}
-
-function extractRequirements(text: string): string[] {
-  const requirements: string[] = [];
-  const reqMatch = text.match(/任职要求[\s\S]*?(?=$)/i) || 
-                   text.match(/任职资格[\s\S]*?(?=$)/i) ||
-                   text.match(/岗位要求[\s\S]*?(?=$)/i) ||
-                   text.match(/职位要求[\s\S]*?(?=$)/i);
-  if (reqMatch) {
-    const reqText = reqMatch[0];
-    const lines = reqText.split(/\n/).filter(line => line.trim().length > 0);
-    for (let line of lines) {
-      line = line.trim();
-      if (/^[1-9]、/.test(line) || /^[1-9]\./.test(line) || /^•/.test(line)) {
-        const cleaned = line.replace(/^[1-9]、|^[1-9]\.|^•\s*/, '').trim();
-        if (cleaned.length > 0) {
-          requirements.push(cleaned);
-        }
-      }
-    }
-  }
-  
-  if (requirements.length === 0) {
-    requirements.push('本科及以上学历');
-    requirements.push('有相关工作经验优先');
-    requirements.push('良好的沟通能力');
-  }
-  
-  return requirements.slice(0, 5);
-}
-
 function extractLocation(text: string): string {
   const locationKeywords = [
     { name: '北京', regex: /北京/i },
@@ -146,11 +89,11 @@ function extractDeliveryMethod(text: string): string {
   const emails = text.match(emailRegex) || [];
   const urls = text.match(urlRegex) || [];
   
-  if (emails.length > 0) {
+  if (emails.length > 0 && emails[0]) {
     return emails[0];
   }
   
-  if (urls.length > 0) {
+  if (urls.length > 0 && urls[0]) {
     return urls[0];
   }
   
@@ -252,7 +195,8 @@ export async function mockAIParse(text: string): Promise<Omit<JobRecord, 'id' | 
         location: extractLocation(text),
         applicationDate: new Date().toISOString().split('T')[0],
         status: '待投递',
-        deliveryMethod: extractDeliveryMethod(text)
+        deliveryMethod: extractDeliveryMethod(text),
+        originalJD: text
       };
       resolve(mockData);
     }, 1000);
