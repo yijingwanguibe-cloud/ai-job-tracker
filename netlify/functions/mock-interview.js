@@ -151,16 +151,25 @@ exports.handler = async (event) => {
   console.log('\n==============================================');
   console.log('🚀 收到模拟面试请求');
   console.log('==============================================');
+  console.log('HTTP Method:', event.httpMethod);
   
   if (event.httpMethod !== 'POST') {
+    console.log('✗ 错误: 只支持 POST 请求');
     return {
       statusCode: 405,
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ error: '只支持 POST 请求' })
     };
   }
   
   try {
-    const { jdText, apiKey, knowledgeBase } = JSON.parse(event.body || '{}');
+    console.log('Parsing request body...');
+    const body = event.body || '{}';
+    console.log('Request body length:', body.length);
+    
+    const { jdText, apiKey, knowledgeBase } = JSON.parse(body);
 
     console.log('📋 JD 文本长度:', jdText?.length);
     console.log('🔑 API Key:', apiKey ? `${apiKey.substring(0, 10)}...` : '未提供');
@@ -170,28 +179,32 @@ exports.handler = async (event) => {
       console.log('✗ 错误: JD文本为空');
       return {
         statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ error: '请提供有效的JD文本' })
       };
     }
 
-    const useApiKey = apiKey;
-    
-    if (!useApiKey) {
+    if (!apiKey || apiKey.trim().length === 0) {
       console.log('✗ 错误: 未提供API Key');
       return {
         statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ error: '请先在设置中配置API Key' })
       };
     }
 
     console.log('\nStep 1/3: 提取关键词...');
-    const keywords = await extractKeywords(jdText, useApiKey);
+    const keywords = await extractKeywords(jdText, apiKey);
 
     console.log('\nStep 2/3: 匹配知识库...');
     const filteredKnowledgeBase = filterKnowledgeBase(knowledgeBase, keywords);
 
     console.log('\nStep 3/3: 生成面试内容...');
-    const result = await generateInterviewContent(jdText, filteredKnowledgeBase, useApiKey);
+    const result = await generateInterviewContent(jdText, filteredKnowledgeBase, apiKey);
 
     console.log('\n==============================================');
     console.log('✅ 所有步骤完成，正在返回结果');
@@ -199,11 +212,15 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify(result)
     };
   } catch (error) {
     console.error('\n==============================================');
     console.error('❌ 错误:', error.message);
+    console.error('Stack:', error.stack);
     console.error('==============================================\n');
 
     let errorMessage = '生成面试内容失败，请稍后重试';
@@ -220,6 +237,9 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({ error: errorMessage })
     };
   }
