@@ -76,40 +76,124 @@ export default function InterviewPage() {
     try {
       setCurrentStep(1);
 
-      const response = await fetch('/api/mock-interview', {
+      const knowledgeBaseText = notes && notes.length > 0
+        ? notes.map((note, index) => 
+            `【${index + 1}】\n标题：${note.title}\n分类：${note.category}\n内容：${note.content.substring(0, 500)}${note.content.length > 500 ? '...' : ''}`
+          ).join('\n\n')
+        : '候选人暂无提供个人知识库内容。';
+
+      const systemPrompt = `你是一个资深面试官和职业规划顾问。基于候选人提供的个人知识库内容和目标职位的JD，你需要：
+
+1. 生成一段定制化的自我介绍（200-300字），要将候选人的经历与JD要求的能力紧密结合
+2. 提出2道极具针对性的面试题，并给出详细的回答建议
+
+请以严格的JSON格式返回结果，格式如下：
+{
+  "introduction": "定制化自我介绍内容",
+  "interviewQuestions": [
+    {
+      "question": "第一道面试题",
+      "answer": "详细的回答建议，最好使用STAR法则",
+      "warning": "答题避坑提醒（如果没有可以为空字符串）"
+    },
+    {
+      "question": "第二道面试题",
+      "answer": "详细的回答建议",
+      "warning": "答题避坑提醒（如果没有可以为空字符串）"
+    }
+  ]
+}
+
+注意：
+- 只返回JSON，不要有其他任何文字说明
+- 自我介绍要自然，不要太生硬
+- 面试题要针对JD中的关键要求
+- 回答建议要具体，有可操作性`;
+
+      const userPrompt = `目标职位JD：
+${currentJD}
+
+候选人个人知识库：
+${knowledgeBaseText}
+
+请基于以上信息，生成定制化自我介绍和2道面试题。`;
+
+      console.log('正在调用 DeepSeek API...');
+      setCurrentStep(2);
+
+      const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${deepseekApiKey}`
         },
         body: JSON.stringify({
-          jdText: currentJD || '',
-          apiKey: deepseekApiKey,
-          knowledgeBase: notes
+          model: 'deepseek-chat',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: userPrompt
+            }
+          ],
+          temperature: 0.7,
+          max_tokens: 2000
         })
       });
 
-      setCurrentStep(2);
-
-      const data = await response.json();
+      setCurrentStep(3);
 
       if (!response.ok) {
-        throw new Error(data.error || '请求失败');
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error?.message || `请求失败: ${response.status}`);
       }
 
+      const data = await response.json();
+      const content = data.choices[0]?.message?.content || '';
+      
+      console.log('AI 响应已收到，长度:', content.length);
+      
+      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) {
+        console.log('AI 返回内容:', content);
+        throw new Error('AI返回格式不正确');
+      }
+
+      const result = JSON.parse(jsonMatch[0]);
+
       const resultWithTimestamp: InterviewResultType = {
-        ...data,
+        ...result,
         createdAt: new Date().toISOString()
       };
 
       setInterviewResult(resultWithTimestamp);
-      setCurrentStep(3);
       
       setTimeout(() => {
         setShowResults(true);
         setWorkflowExpanded(false);
       }, 500);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : '获取面试数据失败，请稍后重试';
+      let errorMessage = '获取面试数据失败，请稍后重试';
+      
+      if (err instanceof Error) {
+        if (err.message.includes('API key') || err.message.includes('authentication') || err.message.includes('401')) {
+          errorMessage = 'API Key 无效，请检查您的设置';
+        } else if (err.message.includes('timeout') || err.message.includes('超时')) {
+          errorMessage = '请求超时，请稍后重试';
+        } else if (err.message.includes('quota') || err.message.includes('insufficient')) {
+          errorMessage = 'API 额度已用完，请检查您的账户';
+        } else if (err.message.includes('rate limit')) {
+          errorMessage = '请求过于频繁，请稍后重试';
+        } else if (err.message.includes('CORS') || err.message.includes('NetworkError')) {
+          errorMessage = '网络请求失败，请检查网络连接';
+        } else {
+          errorMessage = err.message;
+        }
+      }
+      
       setError(errorMessage);
       console.error('获取面试数据失败:', err);
     } finally {
