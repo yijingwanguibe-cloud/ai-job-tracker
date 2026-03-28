@@ -1,4 +1,4 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
+import { Handler } from '@netlify/functions';
 import OpenAI from 'openai';
 import Fuse from 'fuse.js';
 
@@ -148,17 +148,20 @@ ${knowledgeBaseText}
   return JSON.parse(jsonMatch[0]);
 };
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+export const handler: Handler = async (event) => {
   console.log('\n==============================================');
   console.log('🚀 收到模拟面试请求');
   console.log('==============================================');
   
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: '只支持 POST 请求' });
+  if (event.httpMethod !== 'POST') {
+    return {
+      statusCode: 405,
+      body: JSON.stringify({ error: '只支持 POST 请求' })
+    };
   }
   
   try {
-    const { jdText, apiKey, knowledgeBase } = req.body;
+    const { jdText, apiKey, knowledgeBase } = JSON.parse(event.body || '{}');
 
     console.log('📋 JD 文本长度:', jdText?.length);
     console.log('🔑 API Key:', apiKey ? `${apiKey.substring(0, 10)}...` : '未提供');
@@ -166,14 +169,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!jdText || jdText.trim().length === 0) {
       console.log('✗ 错误: JD文本为空');
-      return res.status(400).json({ error: '请提供有效的JD文本' });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: '请提供有效的JD文本' })
+      };
     }
 
     const useApiKey = apiKey;
     
     if (!useApiKey) {
       console.log('✗ 错误: 未提供API Key');
-      return res.status(400).json({ error: '请先在设置中配置API Key' });
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: '请先在设置中配置API Key' })
+      };
     }
 
     console.log('\nStep 1/3: 提取关键词...');
@@ -189,7 +198,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.log('✅ 所有步骤完成，正在返回结果');
     console.log('==============================================\n');
 
-    res.json(result);
+    return {
+      statusCode: 200,
+      body: JSON.stringify(result)
+    };
   } catch (error: any) {
     console.error('\n==============================================');
     console.error('❌ 错误:', error.message);
@@ -207,6 +219,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       errorMessage = '请求过于频繁，请稍后重试';
     }
 
-    res.status(500).json({ error: errorMessage });
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: errorMessage })
+    };
   }
-}
+};
