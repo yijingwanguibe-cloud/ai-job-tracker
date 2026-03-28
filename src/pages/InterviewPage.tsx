@@ -76,7 +76,7 @@ export default function InterviewPage() {
     try {
       setCurrentStep(1);
 
-      const response = await fetch('/.netlify/functions/mock-interview', {
+      const response = await fetch('/api/mock-interview', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
