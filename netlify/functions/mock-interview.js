@@ -1,8 +1,7 @@
-import { Handler } from '@netlify/functions';
-import OpenAI from 'openai';
-import Fuse from 'fuse.js';
+const OpenAI = require('openai');
+const Fuse = require('fuse.js');
 
-const extractKeywords = async (jdText: string, apiKey: string) => {
+const extractKeywords = async (jdText, apiKey) => {
   try {
     console.log('  → 正在调用 DeepSeek API 提取关键词...');
     const openai = new OpenAI({
@@ -31,13 +30,13 @@ const extractKeywords = async (jdText: string, apiKey: string) => {
     const keywords = keywordsText.split(/[,，\s]+/).filter(k => k.trim().length > 0);
     console.log('  ✓ 关键词提取成功:', keywords);
     return keywords;
-  } catch (error: any) {
+  } catch (error) {
     console.warn('  ✗ 关键词提取失败，使用默认关键词:', error.message);
     return ['产品', '增长', '数据分析', '运营', '项目'];
   }
 };
 
-const filterKnowledgeBase = (knowledgeBase: any[], keywords: string[], maxResults = 3) => {
+const filterKnowledgeBase = (knowledgeBase, keywords, maxResults = 3) => {
   console.log('  → 正在匹配知识库...');
   if (!knowledgeBase || knowledgeBase.length === 0) {
     console.log('  - 知识库为空');
@@ -64,11 +63,11 @@ const filterKnowledgeBase = (knowledgeBase: any[], keywords: string[], maxResult
     .slice(0, maxResults)
     .map(result => result.item);
 
-  console.log('  ✓ 匹配到', filteredResults.length, '条知识库记录:', filteredResults.map((n: any) => n.title));
+  console.log('  ✓ 匹配到', filteredResults.length, '条知识库记录:', filteredResults.map((n) => n.title));
   return filteredResults;
 };
 
-const generateInterviewContent = async (jdText: string, filteredKnowledgeBase: any[], apiKey: string) => {
+const generateInterviewContent = async (jdText, filteredKnowledgeBase, apiKey) => {
   console.log('  → 正在生成面试内容...');
   const openai = new OpenAI({
     apiKey: apiKey,
@@ -77,7 +76,7 @@ const generateInterviewContent = async (jdText: string, filteredKnowledgeBase: a
   });
 
   const knowledgeBaseText = filteredKnowledgeBase.length > 0
-    ? filteredKnowledgeBase.map((note: any, index: number) => 
+    ? filteredKnowledgeBase.map((note, index) => 
         `【${index + 1}】\n标题：${note.title}\n分类：${note.category}\n内容：${note.content.substring(0, 500)}${note.content.length > 500 ? '...' : ''}`
       ).join('\n\n')
     : '候选人暂无提供个人知识库内容。';
@@ -148,7 +147,7 @@ ${knowledgeBaseText}
   return JSON.parse(jsonMatch[0]);
 };
 
-export const handler: Handler = async (event) => {
+exports.handler = async (event) => {
   console.log('\n==============================================');
   console.log('🚀 收到模拟面试请求');
   console.log('==============================================');
@@ -202,7 +201,7 @@ export const handler: Handler = async (event) => {
       statusCode: 200,
       body: JSON.stringify(result)
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('\n==============================================');
     console.error('❌ 错误:', error.message);
     console.error('==============================================\n');
